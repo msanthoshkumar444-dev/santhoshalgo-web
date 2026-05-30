@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SanthoshAlgo — Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Syne:wght@400;500;600;700;800&display=swap');
 
@@ -25,97 +26,177 @@
   --green-bg: rgba(0,229,160,.07);
   --red-bg:   rgba(255,77,109,.07);
   --blue-bg:  rgba(61,155,255,.07);
+  --amber-bg: rgba(255,182,38,.07);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
-
-body {
-  font-family: 'JetBrains Mono', monospace;
-  background: var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-  overflow-x: hidden;
-}
-
+body { font-family: 'JetBrains Mono', monospace; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
 body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
+  content: ''; position: fixed; inset: 0;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
-  pointer-events: none;
-  z-index: 0;
-  opacity: .4;
+  pointer-events: none; z-index: 0; opacity: .4;
 }
 
+/* ── TOPBAR ── */
 .topbar {
   position: sticky; top: 0; z-index: 100;
-  background: rgba(8,11,15,.92);
-  backdrop-filter: blur(16px);
+  background: rgba(8,11,15,.92); backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border);
-  padding: 0 28px;
-  height: 52px;
+  padding: 0 28px; height: 52px;
   display: flex; align-items: center; justify-content: space-between;
 }
 .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 15px; letter-spacing: -0.5px; }
 .logo span { color: var(--green); }
 .logo em { color: var(--text2); font-style: normal; font-size: 11px; margin-left: 8px; font-family: 'JetBrains Mono', monospace; font-weight: 400; }
 .nav { display: flex; gap: 4px; }
-.nav a {
-  padding: 5px 14px; border-radius: 6px;
-  font-size: 11px; color: var(--text3); text-decoration: none;
-  transition: all .15s;
-}
+.nav a { padding: 5px 14px; border-radius: 6px; font-size: 11px; color: var(--text3); text-decoration: none; transition: all .15s; }
 .nav a:hover { color: var(--text2); background: var(--bg3); }
 .nav a.active { color: var(--green); background: var(--green-bg); }
-.server-badge {
-  display: flex; align-items: center; gap: 6px;
-  padding: 4px 12px; border-radius: 20px;
-  border: 1px solid var(--border2);
-  font-size: 11px; color: var(--text2);
-  background: var(--bg2);
-}
-.live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
-.live-dot.on  { animation: pulse 2s infinite; box-shadow: 0 0 6px var(--green); }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.server-badge { display: flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border2); font-size: 11px; color: var(--text2); background: var(--bg2); }
+.live-dot { width: 6px; height: 6px; border-radius: 50%; }
+.live-dot.on  { background: var(--green); animation: pulse 2s infinite; box-shadow: 0 0 6px var(--green); }
 .live-dot.off { background: var(--red); }
 @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.3} }
+.clock { font-size: 11px; color: var(--text3); }
 
+/* ── LAYOUT ── */
 .page { max-width: 1280px; margin: 0 auto; padding: 24px 28px; position: relative; z-index: 1; }
 
-.section-header {
-  display: flex; align-items: baseline; gap: 10px;
-  margin-bottom: 14px;
+/* ── HERO METRICS ── */
+.hero { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.hero-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 14px; padding: 20px 22px; position: relative; overflow: hidden;
 }
+.hero-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border2), transparent);
+}
+.hero-card.highlight { border-color: rgba(0,229,160,.2); }
+.hero-card.highlight::before { background: linear-gradient(90deg, transparent, var(--green), transparent); opacity: .3; }
+.hero-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 10px; }
+.hero-value { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; line-height: 1; margin-bottom: 6px; }
+.hero-sub { font-size: 10px; color: var(--text3); }
+.hero-trend { position: absolute; top: 18px; right: 18px; font-size: 18px; opacity: .4; }
+.g { color: var(--green); } .r { color: var(--red); } .b { color: var(--blue); }
+.a { color: var(--amber); } .p { color: var(--purple); } .w { color: var(--text2); }
+
+/* ── SECTION HEADER ── */
+.section-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
 .section-num { font-family: 'Syne', sans-serif; font-size: 11px; color: var(--green); opacity: .6; }
 .section-title { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--text2); }
 
+/* ── CARD ── */
 .card {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 20px 22px;
-  margin-bottom: 20px;
-  position: relative;
-  overflow: hidden;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 20px 22px; margin-bottom: 20px;
+  position: relative; overflow: hidden;
 }
 .card::before {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
   background: linear-gradient(90deg, transparent, var(--border2), transparent);
 }
 
-.empty {
-  text-align: center; padding: 60px 40px; color: var(--text3); font-size: 12px;
+/* ── MAIN GRID ── */
+.main-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 20px; }
+@media(max-width: 960px) { .main-grid { grid-template-columns: 1fr; } }
+
+/* ── CHART ── */
+.chart-wrap { position: relative; width: 100%; height: 200px; }
+.chart-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+
+/* ── STRATEGY CARDS ── */
+.strat-list { display: flex; flex-direction: column; gap: 12px; }
+.strat-mini {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 16px; position: relative;
+  transition: border-color .2s;
 }
-.empty-icon { font-size: 40px; margin-bottom: 14px; }
-.empty-title { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; color: var(--text2); margin-bottom: 8px; }
-.empty-sub { font-size: 11px; color: var(--text3); line-height: 1.8; }
-.coming-soon {
-  display: inline-block; margin-top: 16px;
-  padding: 5px 14px; border-radius: 6px;
-  border: 1px solid var(--border2);
-  font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 1.5px;
+.strat-mini.in-trade { border-color: rgba(0,229,160,.3); }
+.strat-mini.in-trade::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+  background: var(--green); border-radius: 2px 0 0 2px;
 }
+.strat-mini-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.strat-mini-name { font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; }
+.pos-pill { padding: 3px 9px; border-radius: 20px; font-size: 10px; font-weight: 600; }
+.pos-flat  { background: var(--bg4); color: var(--text3); }
+.pos-long  { background: var(--blue-bg); color: var(--blue); border: 1px solid rgba(61,155,255,.25); }
+.pos-short { background: var(--amber-bg); color: var(--amber); border: 1px solid rgba(255,182,38,.25); }
+.strat-mini-pnl { display: flex; gap: 16px; }
+.pnl-mini { display: flex; flex-direction: column; gap: 2px; }
+.pnl-mini-label { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: .6px; }
+.pnl-mini-val { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; }
+.strat-mini-symbols { margin-top: 8px; font-size: 10px; color: var(--text3); line-height: 1.8; }
+
+/* ── ACTIVITY FEED ── */
+.feed { display: flex; flex-direction: column; gap: 0; }
+.feed-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid rgba(26,37,53,.6);
+}
+.feed-item:last-child { border-bottom: none; }
+.feed-dot-wrap { display: flex; flex-direction: column; align-items: center; padding-top: 3px; }
+.feed-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.feed-dot.buy    { background: var(--green); }
+.feed-dot.sell   { background: var(--red); }
+.feed-dot.other  { background: var(--text3); }
+.feed-content { flex: 1; min-width: 0; }
+.feed-title { font-size: 11px; color: var(--text); margin-bottom: 2px; }
+.feed-title strong { color: var(--text2); }
+.feed-meta { font-size: 10px; color: var(--text3); }
+.feed-time { font-size: 10px; color: var(--text3); white-space: nowrap; flex-shrink: 0; }
+
+/* ── NAV TILES ── */
+.nav-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+@media(max-width: 680px) { .nav-tiles { grid-template-columns: 1fr; } }
+.nav-tile {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 20px; text-decoration: none; color: var(--text);
+  display: flex; align-items: flex-start; gap: 14px;
+  transition: all .2s; position: relative; overflow: hidden;
+}
+.nav-tile::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border2), transparent);
+}
+.nav-tile:hover { border-color: var(--border2); background: var(--bg3); transform: translateY(-2px); }
+.nav-tile-icon { font-size: 24px; margin-top: 2px; }
+.nav-tile-body {}
+.nav-tile-label { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.nav-tile-desc { font-size: 10px; color: var(--text3); line-height: 1.6; }
+.nav-tile-arrow { position: absolute; bottom: 16px; right: 16px; font-size: 16px; color: var(--text3); transition: transform .2s; }
+.nav-tile:hover .nav-tile-arrow { transform: translate(2px, -2px); }
+
+/* ── MARKET STATUS BAR ── */
+.market-bar {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  padding: 10px 18px; border-radius: 10px; margin-bottom: 20px;
+  font-size: 11px;
+}
+.market-bar.open   { background: var(--green-bg); border: 1px solid rgba(0,229,160,.15); color: var(--green); }
+.market-bar.closed { background: var(--bg3); border: 1px solid var(--border); color: var(--text3); }
+.market-bar-left { display: flex; align-items: center; gap: 8px; }
+.market-dot { width: 6px; height: 6px; border-radius: 50%; }
+.market-dot.open  { background: var(--green); animation: pulse 2s infinite; box-shadow: 0 0 6px var(--green); }
+.market-dot.closed { background: var(--text3); }
+.market-bar-right { display: flex; gap: 20px; font-size: 10px; }
+.market-stat { display: flex; flex-direction: column; gap: 2px; text-align: right; }
+.market-stat-label { color: var(--text3); }
+.market-stat-val   { color: var(--text2); font-size: 11px; }
+
+/* ── EMPTY ── */
+.empty { text-align: center; padding: 30px; color: var(--text3); font-size: 11px; }
+
+/* ── REFRESH ── */
+.refresh-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; font-size: 11px; color: var(--text3); }
+.refresh-right { display: flex; align-items: center; gap: 10px; }
+.refresh-progress { width: 60px; height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.refresh-fill { height: 100%; background: var(--green); border-radius: 2px; transition: width 1s linear; }
+.btn-sm { padding: 5px 12px; border: 1px solid var(--border2); border-radius: 6px; background: transparent; color: var(--text3); font-size: 10px; font-family: 'JetBrains Mono', monospace; cursor: pointer; transition: all .15s; }
+.btn-sm:hover { background: var(--bg3); color: var(--text2); }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -132,44 +213,415 @@ body::before {
     <a href="/panel.html">Panel</a>
     <a href="/backtest.html">Backtester</a>
   </nav>
-  <div class="server-badge">
-    <div class="live-dot off" id="statusDot"></div>
-    <span id="statusText">Connecting...</span>
-  </div>
-</div>
-
-<div class="page">
-  <div class="section-header">
-    <span class="section-num">01</span>
-    <span class="section-title">Dashboard</span>
-  </div>
-  <div class="card">
-    <div class="empty">
-      <div class="empty-icon">&#9632;</div>
-      <div class="empty-title">Dashboard</div>
-      <div class="empty-sub">
-        Overview of all strategies, daily P&amp;L summary,<br>
-        trade history, and performance metrics will appear here.
-      </div>
-      <span class="coming-soon">Coming Soon</span>
+  <div class="topbar-right">
+    <div class="clock" id="clock">--:--:--</div>
+    <div class="server-badge">
+      <div class="live-dot off" id="statusDot"></div>
+      <span id="statusText">Connecting...</span>
     </div>
   </div>
 </div>
 
+<div class="page">
+
+  <!-- Market bar -->
+  <div class="market-bar closed" id="marketBar">
+    <div class="market-bar-left">
+      <div class="market-dot closed" id="marketDot"></div>
+      <span id="marketLabel">Checking market hours...</span>
+    </div>
+    <div class="market-bar-right" id="marketStats"></div>
+  </div>
+
+  <!-- Refresh row -->
+  <div class="refresh-bar">
+    <span id="lastUpdated">Fetching data...</span>
+    <div class="refresh-right">
+      <div class="refresh-progress"><div class="refresh-fill" id="refreshFill" style="width:100%"></div></div>
+      <button class="btn-sm" onclick="fetchAll()">&#8635; Refresh</button>
+    </div>
+  </div>
+
+  <!-- ① HERO METRICS -->
+  <div class="hero" id="heroRow">
+    <div class="hero-card"><div class="hero-label">Total P&amp;L Today</div><div class="hero-value w">—</div><div class="hero-sub">loading...</div></div>
+    <div class="hero-card"><div class="hero-label">Nifty Spot</div><div class="hero-value w">—</div><div class="hero-sub">loading...</div></div>
+    <div class="hero-card"><div class="hero-label">Active Strategies</div><div class="hero-value w">—</div><div class="hero-sub">loading...</div></div>
+    <div class="hero-card"><div class="hero-label">Trades Today</div><div class="hero-value w">—</div><div class="hero-sub">loading...</div></div>
+    <div class="hero-card"><div class="hero-label">Session</div><div class="hero-value w">—</div><div class="hero-sub">loading...</div></div>
+  </div>
+
+  <!-- ② CHART + STRATEGIES -->
+  <div class="main-grid">
+
+    <!-- Today's order P&L timeline -->
+    <div>
+      <div class="section-header">
+        <span class="section-num">01</span>
+        <span class="section-title">Today's Order Activity</span>
+      </div>
+      <div class="card">
+        <div class="chart-label">Cumulative realised P&amp;L from completed orders</div>
+        <div class="chart-wrap"><canvas id="pnlChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Strategy summary -->
+    <div>
+      <div class="section-header">
+        <span class="section-num">02</span>
+        <span class="section-title">Strategies</span>
+      </div>
+      <div class="strat-list" id="stratList">
+        <div class="strat-mini"><div class="empty">Loading...</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ③ ACTIVITY FEED -->
+  <div class="section-header">
+    <span class="section-num">03</span>
+    <span class="section-title">Order Feed</span>
+  </div>
+  <div class="card">
+    <div class="feed" id="feedList">
+      <div class="empty">Loading order history...</div>
+    </div>
+  </div>
+
+  <!-- ④ NAV TILES -->
+  <div class="section-header">
+    <span class="section-num">04</span>
+    <span class="section-title">Go To</span>
+  </div>
+  <div class="nav-tiles">
+    <a href="/status.html" class="nav-tile">
+      <div class="nav-tile-icon">&#128200;</div>
+      <div class="nav-tile-body">
+        <div class="nav-tile-label" style="color:var(--green)">Live Status</div>
+        <div class="nav-tile-desc">Real-time P&amp;L, open positions, unrealised gains, exit controls</div>
+      </div>
+      <div class="nav-tile-arrow">&#8599;</div>
+    </a>
+    <a href="/panel.html" class="nav-tile">
+      <div class="nav-tile-icon">&#9881;</div>
+      <div class="nav-tile-body">
+        <div class="nav-tile-label" style="color:var(--blue)">Control Panel</div>
+        <div class="nav-tile-desc">Webhook tester, strike preview, positions, orders, add strategy</div>
+      </div>
+      <div class="nav-tile-arrow">&#8599;</div>
+    </a>
+    <a href="/backtest.html" class="nav-tile">
+      <div class="nav-tile-icon">&#9654;</div>
+      <div class="nav-tile-body">
+        <div class="nav-tile-label" style="color:var(--purple)">Backtester</div>
+        <div class="nav-tile-desc">CPR + Black-Scholes backtest engine with equity curve and trade log</div>
+      </div>
+      <div class="nav-tile-arrow">&#8599;</div>
+    </a>
+  </div>
+
+</div>
+
 <script>
 const SERVER = 'https://santhoshalgo.online';
-async function ping() {
-  try {
-    const res = await fetch(SERVER + '/status', { signal: AbortSignal.timeout(8000) });
-    const d = await res.json();
-    document.getElementById('statusDot').className = 'live-dot on';
-    document.getElementById('statusText').textContent = 'Online — Nifty ' + (d.nifty_spot || '--');
-  } catch(e) {
-    document.getElementById('statusDot').className = 'live-dot off';
-    document.getElementById('statusText').textContent = 'Offline';
+const REFRESH_INTERVAL = 20;
+let countdown = REFRESH_INTERVAL;
+let refreshTimer = null;
+let pnlChrt = null;
+let lastOrders = [];
+
+// ── Clock ─────────────────────────────────────────────────────
+function tickClock() {
+  const now = new Date();
+  const ist = new Date(now.getTime() + 5.5 * 3600000);
+  document.getElementById('clock').textContent =
+    ist.toUTCString().slice(17, 25) + ' IST';
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+// ── Market hours ──────────────────────────────────────────────
+function isMarketOpen() {
+  const now = new Date();
+  const ist = new Date(now.getTime() + 5.5 * 3600000);
+  const day = ist.getUTCDay();
+  if (day === 0 || day === 6) return false;
+  const mins = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+  return mins >= 555 && mins <= 930;
+}
+
+function updateMarketBar(d) {
+  const bar   = document.getElementById('marketBar');
+  const dot   = document.getElementById('marketDot');
+  const label = document.getElementById('marketLabel');
+  const stats = document.getElementById('marketStats');
+  const open  = isMarketOpen();
+
+  bar.className   = 'market-bar ' + (open ? 'open' : 'closed');
+  dot.className   = 'market-dot ' + (open ? 'open' : 'closed');
+  label.textContent = open ? 'Market Open  ·  09:15 – 15:30 IST' : 'Market Closed';
+
+  if (d) {
+    stats.innerHTML = `
+      <div class="market-stat"><div class="market-stat-label">Spot</div><div class="market-stat-val">${d.nifty_spot ? d.nifty_spot.toLocaleString('en-IN') : '—'}</div></div>
+      <div class="market-stat"><div class="market-stat-label">ATM</div><div class="market-stat-val">${d.atm_strike ? d.atm_strike.toLocaleString('en-IN') : '—'}</div></div>
+      <div class="market-stat"><div class="market-stat-label">Expiry</div><div class="market-stat-val">${d.next_expiry || '—'}</div></div>
+      <div class="market-stat"><div class="market-stat-label">OTM Dist</div><div class="market-stat-val">${d.otm_distance || '—'} pts</div></div>`;
   }
 }
-ping();
+
+// ── Hero metrics ──────────────────────────────────────────────
+function renderHero(d) {
+  const pnl    = d.total_pnl_today || 0;
+  const pnlCls = pnl >= 0 ? 'g' : 'r';
+  const pnlSign = pnl >= 0 ? '+' : '';
+
+  const strategies  = d.strategies || {};
+  const stratKeys   = Object.keys(strategies);
+  const inTrade     = stratKeys.filter(k => strategies[k].position).length;
+  const session     = d.session_active;
+
+  // Total unrealised
+  const totalUnreal = stratKeys.reduce((s, k) => s + (strategies[k].unrealised_pnl || 0), 0);
+  const uSign = totalUnreal >= 0 ? '+' : '';
+  const uCls  = totalUnreal >= 0 ? 'g' : 'r';
+
+  document.getElementById('heroRow').innerHTML = `
+    <div class="hero-card highlight">
+      <div class="hero-trend">&#8377;</div>
+      <div class="hero-label">Realised P&amp;L Today</div>
+      <div class="hero-value ${pnlCls}">${pnlSign}&#8377;${Math.abs(pnl).toLocaleString('en-IN')}</div>
+      <div class="hero-sub">across all strategies</div>
+    </div>
+    <div class="hero-card">
+      <div class="hero-trend">~</div>
+      <div class="hero-label">Unrealised P&amp;L</div>
+      <div class="hero-value ${uCls}">${uSign}&#8377;${Math.abs(totalUnreal).toLocaleString('en-IN')}</div>
+      <div class="hero-sub">open positions MTM</div>
+    </div>
+    <div class="hero-card">
+      <div class="hero-trend">&#9650;</div>
+      <div class="hero-label">Nifty Spot</div>
+      <div class="hero-value b">${d.nifty_spot ? d.nifty_spot.toLocaleString('en-IN') : '—'}</div>
+      <div class="hero-sub">ATM ${d.atm_strike ? d.atm_strike.toLocaleString('en-IN') : '—'} · ${d.next_expiry || '—'}</div>
+    </div>
+    <div class="hero-card">
+      <div class="hero-trend">&#9632;</div>
+      <div class="hero-label">In Trade</div>
+      <div class="hero-value ${inTrade > 0 ? 'g' : 'w'}">${inTrade} / ${stratKeys.length}</div>
+      <div class="hero-sub">${d.total_trades_today || 0} executions today</div>
+    </div>
+    <div class="hero-card">
+      <div class="hero-trend">&#9679;</div>
+      <div class="hero-label">Session</div>
+      <div class="hero-value ${session ? 'g' : 'r'}">${session ? 'Live' : 'Expired'}</div>
+      <div class="hero-sub">${session ? 'Zerodha token active' : 'Re-auth required at /auth'}</div>
+    </div>`;
+}
+
+// ── Strategy list ─────────────────────────────────────────────
+function renderStrategies(strategies) {
+  const keys = Object.keys(strategies);
+  if (!keys.length) {
+    document.getElementById('stratList').innerHTML = '<div class="empty">No strategies.</div>';
+    return;
+  }
+  document.getElementById('stratList').innerHTML = keys.map(key => {
+    const s    = strategies[key];
+    const pos  = s.position;
+    const real = s.realised_pnl || 0;
+    const unreal = s.unrealised_pnl || 0;
+    const rCls = real   >= 0 ? 'g' : 'r';
+    const uCls = unreal >= 0 ? 'g' : 'r';
+    const posCls = pos === 'LONG' ? 'pos-long' : pos === 'SHORT' ? 'pos-short' : 'pos-flat';
+    const symbolsHtml = pos
+      ? `<div class="strat-mini-symbols">
+           &#9650; ${s.buy_symbol || '—'}&nbsp;&nbsp;&#9660; ${s.sell_symbol || '—'}
+         </div>`
+      : '';
+    return `<div class="strat-mini ${pos ? 'in-trade' : ''}">
+      <div class="strat-mini-header">
+        <div class="strat-mini-name">${s.name || key}</div>
+        <span class="pos-pill ${posCls}">${pos || 'FLAT'}</span>
+      </div>
+      <div class="strat-mini-pnl">
+        <div class="pnl-mini">
+          <div class="pnl-mini-label">Realised</div>
+          <div class="pnl-mini-val ${rCls}">${real >= 0 ? '+' : ''}&#8377;${Math.abs(real).toLocaleString('en-IN')}</div>
+        </div>
+        <div class="pnl-mini">
+          <div class="pnl-mini-label">Unrealised</div>
+          <div class="pnl-mini-val ${uCls}">${pos ? (unreal >= 0 ? '+' : '') + '&#8377;' + Math.abs(unreal).toLocaleString('en-IN') : '—'}</div>
+        </div>
+        <div class="pnl-mini">
+          <div class="pnl-mini-label">Trades</div>
+          <div class="pnl-mini-val w">${s.trades_today || 0}</div>
+        </div>
+      </div>
+      ${symbolsHtml}
+    </div>`;
+  }).join('');
+}
+
+// ── Orders → feed + chart ─────────────────────────────────────
+function renderFeedAndChart(orders) {
+  if (!Array.isArray(orders) || !orders.length) {
+    document.getElementById('feedList').innerHTML = '<div class="empty">No orders placed today.</div>';
+    renderChart([], []);
+    return;
+  }
+
+  // Sort oldest-first for chart; newest-first for feed
+  const sorted  = [...orders].sort((a, b) => new Date(a.order_timestamp) - new Date(b.order_timestamp));
+  const feed    = [...orders].sort((a, b) => new Date(b.order_timestamp) - new Date(a.order_timestamp)).slice(0, 20);
+
+  // Build chart: cumulative realised from COMPLETE BUY orders (proxy — net approach)
+  // Group completed orders by pairs: each spread has 2 legs per direction
+  // Simple approach: sum up average_price * quantity with sign per transaction
+  let cumPnl = 0;
+  const chartLabels = [];
+  const chartData   = [];
+
+  sorted.filter(o => o.status === 'COMPLETE').forEach(o => {
+    const ts   = o.order_timestamp ? new Date(o.order_timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—';
+    const qty  = o.quantity || 0;
+    const px   = o.average_price || 0;
+    const sign = o.transaction_type === 'SELL' ? 1 : -1; // SELL = cash-in, BUY = cash-out
+    cumPnl += sign * px * qty;
+    chartLabels.push(ts);
+    chartData.push(Math.round(cumPnl));
+  });
+
+  renderChart(chartLabels, chartData);
+
+  // Feed
+  document.getElementById('feedList').innerHTML = feed.map(o => {
+    const ts   = o.order_timestamp ? new Date(o.order_timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
+    const side = o.transaction_type || '';
+    const dotCls = side === 'BUY' ? 'buy' : side === 'SELL' ? 'sell' : 'other';
+    const st   = o.status || '';
+    const stColor = st === 'COMPLETE' ? 'var(--green)' : st === 'REJECTED' ? 'var(--red)' : 'var(--amber)';
+    const px   = o.average_price || o.price || 0;
+    return `<div class="feed-item">
+      <div class="feed-dot-wrap"><div class="feed-dot ${dotCls}"></div></div>
+      <div class="feed-content">
+        <div class="feed-title">
+          <strong>${side}</strong> ${o.quantity} × ${o.tradingsymbol}
+          ${px ? ' @ &#8377;' + px : ''}
+        </div>
+        <div class="feed-meta" style="color:${stColor}">${st}</div>
+      </div>
+      <div class="feed-time">${ts}</div>
+    </div>`;
+  }).join('') || '<div class="empty">No orders.</div>';
+}
+
+function renderChart(labels, data) {
+  const ctx = document.getElementById('pnlChart').getContext('2d');
+  if (pnlChrt) pnlChrt.destroy();
+
+  if (!data.length) {
+    ctx.fillStyle = 'rgba(107,132,153,.15)';
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.fillStyle = '#3d5266';
+    ctx.font = '12px JetBrains Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('No completed orders yet today', ctx.canvas.width / 2, ctx.canvas.height / 2);
+    return;
+  }
+
+  const positive = data[data.length - 1] >= 0;
+  const lineColor = positive ? '#00e5a0' : '#ff4d6d';
+  const fillColor = positive ? 'rgba(0,229,160,.06)' : 'rgba(255,77,109,.06)';
+
+  pnlChrt = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        borderColor: lineColor,
+        backgroundColor: fillColor,
+        fill: true,
+        tension: .3,
+        pointRadius: data.length > 20 ? 0 : 3,
+        pointBackgroundColor: lineColor,
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => '&#8377;' + ctx.parsed.y.toLocaleString('en-IN') } }
+      },
+      scales: {
+        y: {
+          ticks: { callback: v => '₹' + (Math.abs(v) >= 1000 ? (v/1000).toFixed(1)+'k' : v), color: '#3d5266', font: { size: 10 } },
+          grid: { color: 'rgba(255,255,255,.03)' },
+          border: { display: false }
+        },
+        x: {
+          ticks: { color: '#3d5266', font: { size: 9 }, maxTicksLimit: 10, maxRotation: 0 },
+          grid: { display: false },
+          border: { display: false }
+        }
+      }
+    }
+  });
+}
+
+// ── Main fetch ────────────────────────────────────────────────
+async function fetchAll() {
+  const [statusRes, ordersRes] = await Promise.allSettled([
+    fetch(SERVER + '/status', { signal: AbortSignal.timeout(8000) }),
+    fetch(SERVER + '/orders', { signal: AbortSignal.timeout(8000) }),
+  ]);
+
+  // Status
+  if (statusRes.status === 'fulfilled' && statusRes.value.ok) {
+    const d = await statusRes.value.json();
+    document.getElementById('statusDot').className  = 'live-dot on';
+    document.getElementById('statusText').textContent = 'Online — Nifty ' + (d.nifty_spot ? d.nifty_spot.toLocaleString('en-IN') : '--');
+    document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString('en-IN');
+    updateMarketBar(d);
+    renderHero(d);
+    renderStrategies(d.strategies || {});
+  } else {
+    document.getElementById('statusDot').className  = 'live-dot off';
+    document.getElementById('statusText').textContent = 'Offline';
+    document.getElementById('lastUpdated').textContent = 'Server unreachable';
+    updateMarketBar(null);
+  }
+
+  // Orders
+  if (ordersRes.status === 'fulfilled' && ordersRes.value.ok) {
+    const orders = await ordersRes.value.json();
+    lastOrders = Array.isArray(orders) ? orders : [];
+    renderFeedAndChart(lastOrders);
+  } else {
+    renderFeedAndChart([]);
+  }
+}
+
+// ── Countdown ─────────────────────────────────────────────────
+function startCountdown() {
+  countdown = REFRESH_INTERVAL;
+  clearInterval(refreshTimer);
+  refreshTimer = setInterval(() => {
+    countdown--;
+    document.getElementById('refreshFill').style.width = (countdown / REFRESH_INTERVAL * 100) + '%';
+    if (countdown <= 0) { fetchAll(); startCountdown(); }
+  }, 1000);
+}
+
+// ── Init ──────────────────────────────────────────────────────
+updateMarketBar(null);
+fetchAll();
+startCountdown();
 </script>
 </body>
 </html>
