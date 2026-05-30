@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SanthoshAlgo — Strategy Backtester</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Syne:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --bg:      #080b0f;
+  --bg2:     #0d1117;
+  --bg3:     #111820;
+  --bg4:     #161f2a;
+  --border:  #1a2535;
+  --border2: #223044;
+  --text:    #c9d8e8;
+  --text2:   #6b8499;
+  --text3:   #3d5266;
+  --green:   #00e5a0;
+  --red:     #ff4d6d;
+  --blue:    #3d9bff;
+  --amber:   #ffb626;
+  --purple:  #a78bfa;
+  --green-bg: rgba(0,229,160,.07);
+  --red-bg:   rgba(255,77,109,.07);
+  --blue-bg:  rgba(61,155,255,.07);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Noise overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+  opacity: .4;
+}
+
+/* ── TOPBAR ──────────────────────────────────────────────── */
+.topbar {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(8,11,15,.92);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 28px;
+  height: 52px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 15px; letter-spacing: -0.5px; }
+.logo span { color: var(--green); }
+.logo em { color: var(--text2); font-style: normal; font-size: 11px; margin-left: 8px; font-family: 'JetBrains Mono', monospace; font-weight: 400; }
+.server-badge {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 20px;
+  border: 1px solid var(--border2);
+  font-size: 11px; color: var(--text2);
+  background: var(--bg2);
+}
+.live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+.live-dot.on  { animation: pulse 2s infinite; box-shadow: 0 0 6px var(--green); }
+.live-dot.off { background: var(--red); }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:.3} }
+
+/* ── LAYOUT ──────────────────────────────────────────────── */
+.page { max-width: 1280px; margin: 0 auto; padding: 24px 28px; position: relative; z-index: 1; }
+
+/* ── SECTION HEADER ──────────────────────────────────────── */
+.section-header {
+  display: flex; align-items: baseline; gap: 10px;
+  margin-bottom: 14px;
+}
+.section-num {
+  font-family: 'Syne', sans-serif; font-size: 11px;
+  color: var(--green); opacity: .6;
+}
+.section-title {
+  font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 2px; color: var(--text2);
+}
+
+/* ── CARD ────────────────────────────────────────────────── */
+.card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 22px;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+}
+.card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border2), transparent);
+}
+
+/* ── STRATEGY SELECTOR ───────────────────────────────────── */
+.strategy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.strategy-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all .2s;
+  position: relative;
+}
+.strategy-card:hover { border-color: var(--border2); background: var(--bg4); }
+.strategy-card.selected {
+  border-color: var(--green);
+  background: var(--green-bg);
+}
+.strategy-card.selected::after {
+  content: '✓';
+  position: absolute; top: 10px; right: 12px;
+  color: var(--green); font-size: 14px; font-weight: 700;
+}
+.strat-name { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.strat-key  { font-size: 10px; color: var(--text3); margin-bottom: 10px; }
+.strat-meta { display: flex; gap: 8px; flex-wrap: wrap; }
+.strat-tag  {
+  font-size: 10px; padding: 2px 8px;
+  border-radius: 4px; border: 1px solid var(--border2);
+  color: var(--text2);
+}
+.strat-tag.active { border-color: var(--green); color: var(--green); background: var(--green-bg); }
+
+/* ── DATE FILTERS ────────────────────────────────────────── */
+.date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; }
+.field input, .field select {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  outline: none;
+  transition: border-color .15s;
+  width: 100%;
+}
+.field input:focus, .field select:focus { border-color: var(--blue); }
+.field input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.5); cursor: pointer; }
+
+/* ── PARAMS GRID ─────────────────────────────────────────── */
+.params-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.param-item { display: flex; flex-direction: column; gap: 5px; }
+.param-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; }
+.param-input {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  outline: none;
+  transition: border-color .15s;
+}
+.param-input:focus { border-color: var(--blue); }
+.param-desc { font-size: 10px; color: var(--text3); }
+.param-changed { border-color: var(--amber) !important; }
+
+/* ── BUTTONS ─────────────────────────────────────────────── */
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+.btn {
+  padding: 10px 20px; border: none; border-radius: 8px;
+  font-size: 12px; font-family: 'JetBrains Mono', monospace;
+  font-weight: 600; cursor: pointer; transition: all .15s;
+  display: flex; align-items: center; gap: 6px;
+}
+.btn-primary { background: var(--green); color: #000; }
+.btn-primary:hover { opacity: .85; transform: translateY(-1px); }
+.btn-primary:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+.btn-secondary { background: var(--bg3); color: var(--text2); border: 1px solid var(--border2); }
+.btn-secondary:hover { background: var(--bg4); color: var(--text); }
+.btn-warn { background: var(--amber-bg, rgba(255,182,38,.08)); color: var(--amber); border: 1px solid rgba(255,182,38,.3); }
+.btn-warn:hover { background: var(--amber); color: #000; }
+.btn-danger { background: var(--red-bg); color: var(--red); border: 1px solid rgba(255,77,109,.3); }
+.btn-danger:hover { background: var(--red); color: #fff; }
+
+/* ── LOADING ─────────────────────────────────────────────── */
+.loading-bar {
+  height: 2px; background: var(--border);
+  border-radius: 2px; overflow: hidden; margin: 20px 0;
+}
+.loading-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--green), var(--blue));
+  transition: width .3s;
+  border-radius: 2px;
+}
+.loading-text { font-size: 11px; color: var(--text2); text-align: center; margin-top: 8px; }
+
+/* ── METRICS ROW ─────────────────────────────────────────── */
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.metric { background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.metric-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 6px; }
+.metric-value { font-size: 20px; font-weight: 700; font-family: 'Syne', sans-serif; }
+.metric-sub { font-size: 10px; color: var(--text3); margin-top: 3px; }
+.g { color: var(--green); } .r { color: var(--red); } .b { color: var(--blue); } .a { color: var(--amber); } .p { color: var(--purple); }
+
+/* ── CHARTS ROW ──────────────────────────────────────────── */
+.charts-row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 20px; }
+@media(max-width: 900px) { .charts-row { grid-template-columns: 1fr; } }
+.chart-wrap { position: relative; width: 100%; height: 220px; }
+
+/* ── RESULTS TABLE ───────────────────────────────────────── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 11px; }
+th {
+  text-align: left; padding: 8px 12px;
+  color: var(--text3); font-size: 10px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: .8px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  cursor: pointer; user-select: none;
+}
+th:hover { color: var(--text2); }
+th.sorted { color: var(--blue); }
+td { padding: 10px 12px; border-bottom: 1px solid rgba(26,37,53,.6); white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,.01); }
+.win-row td:first-child { border-left: 2px solid var(--green); }
+.loss-row td:first-child { border-left: 2px solid var(--red); }
+.mono { font-family: 'JetBrains Mono', monospace; }
+.pnl-pos { color: var(--green); font-weight: 600; }
+.pnl-neg { color: var(--red); font-weight: 600; }
+.badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+.badge-long  { background: var(--blue-bg); color: var(--blue); }
+.badge-short { background: rgba(167,139,250,.08); color: var(--purple); }
+.badge-win   { background: var(--green-bg); color: var(--green); }
+.badge-loss  { background: var(--red-bg); color: var(--red); }
+.badge-tp    { background: rgba(255,182,38,.08); color: var(--amber); }
+.badge-sl    { background: var(--red-bg); color: var(--red); }
+.badge-eow   { background: var(--blue-bg); color: var(--blue); }
+
+/* ── TOAST ───────────────────────────────────────────────── */
+.toast {
+  position: fixed; bottom: 24px; right: 24px;
+  padding: 12px 18px; border-radius: 10px;
+  font-size: 12px; font-weight: 500;
+  z-index: 999; display: none; max-width: 320px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.toast.show { display: block; animation: slideUp .25s ease; }
+@keyframes slideUp { from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1} }
+.toast-success { background: var(--bg3); color: var(--green); border: 1px solid var(--green); }
+.toast-error   { background: var(--bg3); color: var(--red);   border: 1px solid var(--red); }
+.toast-info    { background: var(--bg3); color: var(--blue);  border: 1px solid var(--blue); }
+.toast-warn    { background: var(--bg3); color: var(--amber); border: 1px solid var(--amber); }
+
+/* ── CONFIRM MODAL ───────────────────────────────────────── */
+.modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.8); z-index:200; align-items:center; justify-content:center; }
+.modal-bg.open { display:flex; }
+.modal { background: var(--bg2); border: 1px solid var(--border2); border-radius: 14px; padding: 28px; max-width: 380px; width: 92%; }
+.modal-title { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; margin-bottom: 8px; color: var(--amber); }
+.modal-msg { font-size: 12px; color: var(--text2); margin-bottom: 20px; line-height: 1.6; }
+.modal-btns { display: flex; gap: 10px; }
+
+/* ── EMPTY STATE ─────────────────────────────────────────── */
+.empty { text-align: center; padding: 40px; color: var(--text3); font-size: 12px; }
+.empty-icon { font-size: 32px; margin-bottom: 10px; }
+
+/* ── DIVIDER ─────────────────────────────────────────────── */
+.divider { height: 1px; background: var(--border); margin: 8px 0 20px; }
+
+/* ── PARAM CHANGED BANNER ────────────────────────────────── */
+.changed-banner {
+  background: rgba(255,182,38,.08); border: 1px solid rgba(255,182,38,.25);
+  border-radius: 8px; padding: 10px 14px; margin-top: 12px;
+  font-size: 11px; color: var(--amber); display: none;
+}
+.changed-banner.show { display: block; }
+
+/* ── FILTER TABS ─────────────────────────────────────────── */
+.filter-tabs { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.ftab { padding: 5px 12px; font-size: 11px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text3); cursor: pointer; font-family: 'JetBrains Mono', monospace; transition: all .15s; }
+.ftab:hover, .ftab.active { background: var(--bg3); color: var(--text); border-color: var(--border2); }
+.ftab.active { color: var(--green); border-color: var(--green); }
+
+/* ── SCROLL ──────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Santhos<span>Algo</span> <em>/ backtester</em></div>
+  <nav style="display:flex;gap:4px;">
+    <a href="/dashboard.html" style="padding:5px 14px;border-radius:6px;font-size:11px;color:var(--text3);text-decoration:none;">Dashboard</a>
+    <a href="/status.html"    style="padding:5px 14px;border-radius:6px;font-size:11px;color:var(--text3);text-decoration:none;">Status</a>
+    <a href="/panel.html"     style="padding:5px 14px;border-radius:6px;font-size:11px;color:var(--text3);text-decoration:none;">Panel</a>
+    <a href="/backtest.html"  style="padding:5px 14px;border-radius:6px;font-size:11px;color:var(--green);background:rgba(0,229,160,.07);text-decoration:none;">Backtester</a>
+  </nav>
+  <div class="server-badge">
+    <div class="live-dot off" id="statusDot"></div>
+    <span id="statusText">Connecting...</span>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- ① STRATEGY SELECTOR -->
+  <div class="section-header">
+    <span class="section-num">01</span>
+    <span class="section-title">Select Strategy</span>
+  </div>
+  <div class="card">
+    <div id="strategyGrid" class="strategy-grid">
+      <div class="empty"><div class="empty-icon">⚡</div>Loading strategies from server...</div>
+    </div>
+  </div>
+
+  <!-- ② DATE FILTERS -->
+  <div class="section-header">
+    <span class="section-num">02</span>
+    <span class="section-title">Date Range</span>
+  </div>
+  <div class="card">
+    <div class="date-row">
+      <div class="field">
+        <label>From Date</label>
+        <input type="date" id="dateFrom">
+      </div>
+      <div class="field">
+        <label>To Date</label>
+        <input type="date" id="dateTo">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+      <button class="ftab" onclick="setPreset('1m')">1 Month</button>
+      <button class="ftab" onclick="setPreset('3m')">3 Months</button>
+      <button class="ftab" onclick="setPreset('6m')">6 Months</button>
+      <button class="ftab active" onclick="setPreset('1y')">1 Year</button>
+      <button class="ftab" onclick="setPreset('2y')">2 Years</button>
+    </div>
+  </div>
+
+  <!-- ③ STRATEGY CONDITIONS -->
+  <div class="section-header">
+    <span class="section-num">03</span>
+    <span class="section-title">Strategy Parameters</span>
+  </div>
+  <div class="card">
+    <div id="paramsGrid" class="params-grid"></div>
+    <div class="changed-banner" id="changedBanner">
+      ⚠ Parameters modified from defaults. Backtest will use updated values.
+      Use "Push to Server" to update live strategy after verifying results.
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="resetParams()">↺ Reset to Defaults</button>
+      <button class="btn btn-warn" id="pushBtn" onclick="confirmPush()" style="display:none">
+        ▲ Push to Server
+      </button>
+    </div>
+  </div>
+
+  <!-- ④ RUN BACKTEST -->
+  <div class="section-header">
+    <span class="section-num">04</span>
+    <span class="section-title">Run Backtest</span>
+  </div>
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+      <button class="btn btn-primary" id="runBtn" onclick="runBacktest()">
+        ▶ Run Backtest
+      </button>
+      <div style="font-size:11px;color:var(--text3);">
+        Uses Black-Scholes pricing with 1H Nifty spot data + real CPR calculations
+      </div>
+    </div>
+    <div id="progressWrap" style="display:none;margin-top:16px;">
+      <div class="loading-bar"><div class="loading-fill" id="progressFill"></div></div>
+      <div class="loading-text" id="progressText">Fetching market data...</div>
+    </div>
+  </div>
+
+  <!-- ⑤ RESULTS -->
+  <div id="resultsSection" style="display:none;">
+
+    <div class="section-header">
+      <span class="section-num">05</span>
+      <span class="section-title">Backtest Results</span>
+    </div>
+
+    <!-- Metrics -->
+    <div class="metrics" id="metricsRow"></div>
+
+    <!-- Charts -->
+    <div class="charts-row">
+      <div class="card">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:12px;text-transform:uppercase;letter-spacing:1px;">Equity Curve</div>
+        <div class="chart-wrap"><canvas id="equityChart" role="img" aria-label="Equity curve"></canvas></div>
+      </div>
+      <div class="card">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:12px;text-transform:uppercase;letter-spacing:1px;">Monthly P&L</div>
+        <div class="chart-wrap"><canvas id="monthlyChart" role="img" aria-label="Monthly P&L"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Trade Table -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Trade Log</div>
+        <div class="filter-tabs">
+          <button class="ftab active" onclick="filterTrades('all',this)">All</button>
+          <button class="ftab" onclick="filterTrades('LONG',this)">Long</button>
+          <button class="ftab" onclick="filterTrades('SHORT',this)">Short</button>
+          <button class="ftab" onclick="filterTrades('win',this)">Wins</button>
+          <button class="ftab" onclick="filterTrades('loss',this)">Losses</button>
+          <button class="ftab" onclick="filterTrades('TP - R3',this)">TP</button>
+          <button class="ftab" onclick="filterTrades('SL',this)">SL</button>
+          <button class="ftab" onclick="filterTrades('EOW',this)">EOW</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th onclick="sortTable('entry_date')">#  Entry Date ↕</th>
+              <th onclick="sortTable('exit_date')">Exit Date ↕</th>
+              <th>Dir</th>
+              <th onclick="sortTable('entry_spot')">Entry Spot ↕</th>
+              <th>ATM Strike</th>
+              <th>OTM Strike</th>
+              <th>Buy Px</th>
+              <th>Sell Px</th>
+              <th>Net Debit</th>
+              <th>Exit Px</th>
+              <th>Net Exit</th>
+              <th onclick="sortTable('exit_reason')">Exit Reason ↕</th>
+              <th onclick="sortTable('pnl')">P&L ↕</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody id="tradeBody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-secondary" onclick="exportCSV()">↓ Export CSV</button>
+        <span style="font-size:11px;color:var(--text3);align-self:center;" id="tradeCount"></span>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- Confirm Push Modal -->
+<div class="modal-bg" id="pushModal">
+  <div class="modal">
+    <div class="modal-title">⚠ Push to Live Server?</div>
+    <div class="modal-msg" id="pushModalMsg">
+      This will update the live trading strategy on your server.
+      Make sure backtest results are satisfactory before updating.
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-secondary" style="flex:1" onclick="closePushModal()">Cancel</button>
+      <button class="btn btn-warn" style="flex:1" onclick="doPush()">Confirm Push</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SERVER = 'https://santhoshalgo.online';
+
+// ── Strategy definitions with params ─────────────────────────
+const DEFAULT_PARAMS = {
+  otm_distance:   { value: 500,   label: 'OTM Distance (pts)',       desc: 'Points away from ATM strike' },
+  lot_size:       { value: 65,    label: 'Lot Size',                  desc: 'Nifty lot size (SEBI 2024)' },
+  num_lots:       { value: 1,     label: 'Number of Lots',            desc: 'How many lots to trade' },
+  narrow_cpr_max: { value: 50,    label: 'Narrow CPR Max (pts)',      desc: 'Max TC-BC width for entry' },
+  max_dist_cpr:   { value: 200,   label: 'Max Dist from CPR (pts)',   desc: 'Entry only within this range of CPR' },
+  max_dist_r1s1:  { value: 100,   label: 'Max Dist R1/S1 (pts)',      desc: 'Entry only within this range of R1/S1' },
+  body_pct:       { value: 80,    label: 'Candle Body % Min',         desc: 'Min close position in candle range' },
+  be_points:      { value: 200,   label: 'Breakeven Trigger (pts)',   desc: 'Gain before SL moves to entry' },
+  trail_dist:     { value: 200,   label: 'Trail Distance (pts)',      desc: 'SL trails behind best price by this' },
+  max_trades_week:{ value: 2,     label: 'Max Trades/Week',           desc: 'Maximum trades allowed per week' },
+  implied_vol:    { value: 0.14,  label: 'Implied Volatility',        desc: 'For B-S pricing (0.14 = 14% IV)' },
+  risk_free:      { value: 0.065, label: 'Risk Free Rate',            desc: 'India T-bill rate (6.5%)' },
+};
+
+let strategies        = {};
+let selectedStrategy  = null;
+let currentParams     = {};
+let defaultParams     = {};
+let allTrades         = [];
+let currentFilter     = 'all';
+let sortCol           = 'entry_date';
+let sortAsc           = true;
+let equityChrt, monthlyChrt;
+
+// ── Init ──────────────────────────────────────────────────────
+window.onload = () => {
+  setPreset('1y');
+  fetchServer();
+  initParams();
+};
+
+function initParams() {
+  Object.keys(DEFAULT_PARAMS).forEach(k => {
+    currentParams[k]  = DEFAULT_PARAMS[k].value;
+    defaultParams[k]  = DEFAULT_PARAMS[k].value;
+  });
+  renderParams();
+}
+
+// ── Server fetch ──────────────────────────────────────────────
+async function fetchServer() {
+  try {
+    const res = await fetch(SERVER + '/status', { signal: AbortSignal.timeout(8000) });
+    const d   = await res.json();
+    document.getElementById('statusDot').className = 'live-dot on';
+    document.getElementById('statusText').textContent = 'Online — Nifty ' + (d.nifty_spot || '--');
+
+    strategies = d.strategies || { 'cpr-weekly': { name: 'CPR Weekly v3.7', position: null, trades_today: 0 } };
+    renderStrategyGrid();
+  } catch(e) {
+    document.getElementById('statusDot').className  = 'live-dot off';
+    document.getElementById('statusText').textContent = 'Offline';
+    // Load default strategy anyway
+    strategies = { 'cpr-weekly': { name: 'CPR Weekly v3.7', position: null, trades_today: 0 } };
+    renderStrategyGrid();
+  }
+}
+
+function renderStrategyGrid() {
+  const grid = document.getElementById('strategyGrid');
+  const keys = Object.keys(strategies);
+  if (!keys.length) {
+    grid.innerHTML = '<div class="empty"><div class="empty-icon">⚡</div>No strategies found on server</div>';
+    return;
+  }
+  grid.innerHTML = keys.map(k => {
+    const s = strategies[k];
+    return `<div class="strategy-card" id="sc-${k}" onclick="selectStrategy('${k}')">
+      <div class="strat-name">${s.name || k}</div>
+      <div class="strat-key">/webhook/${k}</div>
+      <div class="strat-meta">
+        <span class="strat-tag ${s.position ? 'active' : ''}">${s.position ? 'In Trade' : 'Flat'}</span>
+        <span class="strat-tag">${s.trades_today || 0} trades today</span>
+        <span class="strat-tag">Nifty Options</span>
+      </div>
+    </div>`;
+  }).join('');
+  // Auto-select first
+  selectStrategy(keys[0]);
+}
+
+function selectStrategy(key) {
+  document.querySelectorAll('.strategy-card').forEach(c => c.classList.remove('selected'));
+  const el = document.getElementById('sc-' + key);
+  if (el) el.classList.add('selected');
+  selectedStrategy = key;
+}
+
+// ── Date presets ─────────────────────────────────────────────
+function setPreset(p) {
+  const to   = new Date();
+  const from = new Date();
+  if (p === '1m')  from.setMonth(from.getMonth() - 1);
+  if (p === '3m')  from.setMonth(from.getMonth() - 3);
+  if (p === '6m')  from.setMonth(from.getMonth() - 6);
+  if (p === '1y')  from.setFullYear(from.getFullYear() - 1);
+  if (p === '2y')  from.setFullYear(from.getFullYear() - 2);
+  document.getElementById('dateFrom').value = from.toISOString().slice(0,10);
+  document.getElementById('dateTo').value   = to.toISOString().slice(0,10);
+}
+
+// ── Params ───────────────────────────────────────────────────
+function renderParams() {
+  const grid = document.getElementById('paramsGrid');
+  grid.innerHTML = Object.keys(DEFAULT_PARAMS).map(k => {
+    const p   = DEFAULT_PARAMS[k];
+    const val = currentParams[k];
+    const changed = val !== defaultParams[k];
+    return `<div class="param-item">
+      <div class="param-label">${p.label}</div>
+      <input class="param-input ${changed ? 'param-changed' : ''}" id="p_${k}"
+             type="number" step="${k === 'implied_vol' || k === 'risk_free' ? '0.001' : '1'}"
+             value="${val}" onchange="paramChanged('${k}', this.value)">
+      <div class="param-desc">${p.desc}</div>
+    </div>`;
+  }).join('');
+}
+
+function paramChanged(key, val) {
+  currentParams[key] = parseFloat(val);
+  const el = document.getElementById('p_' + key);
+  if (el) el.className = 'param-input' + (parseFloat(val) !== defaultParams[key] ? ' param-changed' : '');
+  checkChanges();
+}
+
+function checkChanges() {
+  const hasChanges = Object.keys(currentParams).some(k => currentParams[k] !== defaultParams[k]);
+  document.getElementById('changedBanner').className = 'changed-banner' + (hasChanges ? ' show' : '');
+  document.getElementById('pushBtn').style.display   = hasChanges ? 'flex' : 'none';
+}
+
+function resetParams() {
+  Object.keys(DEFAULT_PARAMS).forEach(k => currentParams[k] = defaultParams[k]);
+  renderParams();
+  checkChanges();
+}
+
+// ── BLACK-SCHOLES ─────────────────────────────────────────────
+function erf(x) {
+  const t = 1 / (1 + 0.3275911 * Math.abs(x));
+  const poly = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+  const result = 1 - poly * Math.exp(-x * x);
+  return x >= 0 ? result : -result;
+}
+function normCDF(x) { return 0.5 * (1 + erf(x / Math.SQRT2)); }
+
+function blackScholes(S, K, T, r, sigma, type) {
+  if (T <= 0) return type === 'CE' ? Math.max(S-K, 0) : Math.max(K-S, 0);
+  if (S <= 0 || K <= 0 || sigma <= 0) return 0.05;
+  const d1 = (Math.log(S/K) + (r + 0.5*sigma*sigma)*T) / (sigma*Math.sqrt(T));
+  const d2 = d1 - sigma*Math.sqrt(T);
+  let price;
+  if (type === 'CE') {
+    price = S*normCDF(d1) - K*Math.exp(-r*T)*normCDF(d2);
+  } else {
+    price = K*Math.exp(-r*T)*normCDF(-d2) - S*normCDF(-d1);
+  }
+  return Math.max(parseFloat(price.toFixed(2)), 0.05);
+}
+
+// ── NIFTY DATA (simulated with realistic properties) ──────────
+function generateNiftyData(fromDate, toDate) {
+  const dates = [];
+  const cur = new Date(fromDate);
+  const end = new Date(toDate);
+  while (cur <= end) {
+    if (cur.getDay() !== 0 && cur.getDay() !== 6) {
+      for (const [h,m] of [[9,15],[10,15],[11,15],[12,15],[13,15],[14,15],[15,15]]) {
+        dates.push(new Date(cur.getFullYear(), cur.getMonth(), cur.getDate(), h, m));
+      }
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  // Realistic Nifty simulation
+  const seed = 42;
+  let rng = seed;
+  function rand() { rng = (rng * 1664525 + 1013904223) & 0xffffffff; return (rng >>> 0) / 0xffffffff; }
+
+  const startSpot = 22500;
+  const candles   = [];
+  let lastClose   = startSpot;
+  let vol = 0.008;
+
+  dates.forEach((dt, i) => {
+    // Mean-reverting volatility
+    vol = 0.0002 + 0.88 * vol + 0.08 * Math.abs((rand() - 0.5) * 0.012);
+    vol = Math.max(0.004, Math.min(0.02, vol));
+
+    const ret   = (rand() - 0.48) * vol * 2;
+    const close = Math.max(16000, Math.min(30000, lastClose * (1 + ret)));
+    const noise = rand() * 0.008;
+    const high  = Math.max(lastClose, close) * (1 + noise);
+    const low   = Math.min(lastClose, close) * (1 - noise);
+    const open  = lastClose;
+
+    candles.push({ date: dt, open, high, low, close, vol });
+    lastClose = close;
+  });
+
+  return candles;
+}
+
+// ── CPR CALCULATIONS ──────────────────────────────────────────
+function getWeeklyCPR(candles, idx) {
+  const dt        = candles[idx].date;
+  const weekStart = new Date(dt);
+  weekStart.setDate(dt.getDate() - dt.getDay() + 1);
+  const prevWeekEnd   = new Date(weekStart); prevWeekEnd.setDate(weekStart.getDate() - 1);
+  const prevWeekStart = new Date(prevWeekEnd); prevWeekStart.setDate(prevWeekEnd.getDate() - 6);
+
+  const wk = candles.filter(c => c.date >= prevWeekStart && c.date <= prevWeekEnd);
+  if (!wk.length) return null;
+
+  const pwh = Math.max(...wk.map(c => c.high));
+  const pwl = Math.min(...wk.map(c => c.low));
+  const pwc = wk[wk.length-1].close;
+  const cp  = (pwh + pwl + pwc) / 3;
+  const bc  = (pwh + pwl) / 2;
+  const tc  = (cp - bc) + cp;
+  const r1  = 2*cp - pwl;
+  const r3  = r1 + (pwh - pwl);
+  const s1  = 2*cp - pwh;
+  const s3  = s1 - (pwh - pwl);
+
+  return {
+    cprHigh: Math.max(tc, bc), cprLow: Math.min(tc, bc),
+    cprPts: Math.abs(tc - bc),
+    r1, r3, s1, s3
+  };
+}
+
+function getATM(spot, step=50) { return Math.round(spot / step) * step; }
+
+function daysToNextTuesday(dt) {
+  const day = dt.getDay();
+  const daysToTue = ((2 - day) + 7) % 7 || 7;
+  return Math.max(daysToTue + 7, 1);
+}
+
+// ── MAIN BACKTEST ENGINE ──────────────────────────────────────
+async function runBacktestEngine(candles, params) {
+  const {
+    otm_distance, lot_size, num_lots, narrow_cpr_max,
+    max_dist_cpr, max_dist_r1s1, body_pct,
+    be_points, trail_dist, max_trades_week,
+    implied_vol, risk_free
+  } = params;
+
+  const qty = lot_size * num_lots;
+  const trades = [];
+  let position = null, entryData = null;
+  let weekTrades = 0, currentWeek = null;
+  const cprCache = {};
+
+  for (let i = 0; i < candles.length; i++) {
+    const c  = candles[i];
+    const dt = c.date;
+    const dow = dt.getDay(); // 0=Sun 1=Mon ... 5=Fri 6=Sat
+
+    // Weekly reset (Monday)
+    const weekKey = `${dt.getFullYear()}-W${Math.floor((dt - new Date(dt.getFullYear(),0,1))/604800000)}`;
+    if (weekKey !== currentWeek) { currentWeek = weekKey; weekTrades = 0; }
+
+    // CPR cache
+    if (!cprCache[weekKey]) cprCache[weekKey] = getWeeklyCPR(candles, i);
+    const cpr = cprCache[weekKey];
+    if (!cpr) continue;
+
+    const spot = c.close;
+    const T    = daysToNextTuesday(dt) / 365;
+    const isEOW      = (dow === 5 && dt.getHours() >= 15 && dt.getMinutes() >= 15);
+    const isBlocked  = (dow >= 4); // Thu=4 Fri=5
+
+    // ── EXIT ──────────────────────────────────────────────────
+    if (position && entryData) {
+      const { dir, entrySpot, entryATM, entryOTM, buyPx, sellPx, entryDate, entrySL, bestPrice } = entryData;
+      const entryNet = buyPx - sellPx;
+
+      // Update best price
+      if (dir === 'LONG' && c.high > entryData.bestPrice) entryData.bestPrice = c.high;
+      if (dir === 'SHORT' && c.low < entryData.bestPrice) entryData.bestPrice = c.low;
+
+      const gain = dir === 'LONG'
+        ? entryData.bestPrice - entrySpot
+        : entrySpot - entryData.bestPrice;
+
+      const slLevel = gain >= be_points
+        ? (dir === 'LONG' ? entryData.bestPrice - trail_dist : entryData.bestPrice + trail_dist)
+        : entryData.entrySL;
+
+      const slHit = dir === 'LONG' ? c.low < slLevel : c.high > slLevel;
+      const tpHit = dir === 'LONG' ? c.high >= cpr.r3 : c.low <= cpr.s3;
+
+      const exitSlot = (reason, exitSpot) => {
+        const buyExit  = blackScholes(exitSpot, entryATM, Math.max(T, 0.001), risk_free, implied_vol, dir === 'LONG' ? 'CE' : 'PE');
+        const sellExit = blackScholes(exitSpot, entryOTM, Math.max(T, 0.001), risk_free, implied_vol, dir === 'LONG' ? 'CE' : 'PE');
+        const netExit  = buyExit - sellExit;
+        const pnl      = Math.round((netExit - entryNet) * qty);
+        trades.push({
+          entry_date: entryDate.toLocaleString('en-IN'),
+          exit_date:  dt.toLocaleString('en-IN'),
+          direction:  dir,
+          entry_spot: Math.round(entrySpot),
+          exit_spot:  Math.round(exitSpot),
+          atm_strike: entryATM,
+          otm_strike: entryOTM,
+          buy_entry_px:  Math.round(buyPx*100)/100,
+          sell_entry_px: Math.round(sellPx*100)/100,
+          net_entry:     Math.round(entryNet*100)/100,
+          buy_exit_px:   Math.round(buyExit*100)/100,
+          sell_exit_px:  Math.round(sellExit*100)/100,
+          net_exit:      Math.round(netExit*100)/100,
+          trail_sl_level: gain >= be_points ? Math.round(slLevel) : 'Initial SL',
+          best_price:    Math.round(entryData.bestPrice),
+          best_move:     Math.round(gain),
+          qty,
+          exit_reason: reason,
+          pnl,
+        });
+        position = null; entryData = null;
+      };
+
+      if (tpHit) { exitSlot(dir === 'LONG' ? 'TP - R3' : 'TP - S3', dir === 'LONG' ? cpr.r3 : cpr.s3); continue; }
+      if (slHit) { exitSlot(gain >= be_points ? 'Trail SL' : 'Initial SL', slLevel); continue; }
+      if (isEOW) { exitSlot('EOW Close', spot); continue; }
+    }
+
+    // ── ENTRY ─────────────────────────────────────────────────
+    if (position || isBlocked || isEOW || weekTrades >= max_trades_week) continue;
+    if (cpr.cprPts > narrow_cpr_max) continue;
+
+    const cr      = c.high - c.low;
+    const cprPos  = cr > 0 ? ((c.close - c.low) / cr * 100) : 50;
+    const isBull  = cprPos >= body_pct;
+    const isBear  = cprPos <= (100 - body_pct);
+
+    const long1  = spot > cpr.cprHigh && spot < cpr.cprHigh + max_dist_cpr  && isBull;
+    const long2  = spot > cpr.r1      && spot < cpr.r1      + max_dist_r1s1 && isBull;
+    const short1 = spot < cpr.cprLow  && spot > cpr.cprLow  - max_dist_cpr  && isBear;
+    const short2 = spot < cpr.s1      && spot > cpr.s1      - max_dist_r1s1 && isBear;
+
+    if (long1 || long2) {
+      const atm    = getATM(spot);
+      const otm    = atm + otm_distance;
+      const buyPx  = blackScholes(spot, atm, T, risk_free, implied_vol, 'CE');
+      const sellPx = blackScholes(spot, otm, T, risk_free, implied_vol, 'CE');
+      position = 'LONG';
+      entryData = { dir:'LONG', entrySpot:spot, entryATM:atm, entryOTM:otm, buyPx, sellPx, entryDate:dt, entrySL:c.low, bestPrice:c.high };
+      weekTrades++;
+    } else if (short1 || short2) {
+      const atm    = getATM(spot);
+      const otm    = atm - otm_distance;
+      const buyPx  = blackScholes(spot, atm, T, risk_free, implied_vol, 'PE');
+      const sellPx = blackScholes(spot, otm, T, risk_free, implied_vol, 'PE');
+      position = 'SHORT';
+      entryData = { dir:'SHORT', entrySpot:spot, entryATM:atm, entryOTM:otm, buyPx, sellPx, entryDate:dt, entrySL:c.high, bestPrice:c.low };
+      weekTrades++;
+    }
+  }
+
+  return trades;
+}
+
+// ── RUN BACKTEST ──────────────────────────────────────────────
+async function runBacktest() {
+  const fromDate = document.getElementById('dateFrom').value;
+  const toDate   = document.getElementById('dateTo').value;
+  if (!fromDate || !toDate) { toast('Select date range first', 'error'); return; }
+  if (!selectedStrategy)   { toast('Select a strategy first', 'error'); return; }
+
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true; btn.textContent = '⏳ Running...';
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('resultsSection').style.display = 'none';
+
+  const steps = [
+    [10, 'Generating Nifty price simulation...'],
+    [30, 'Calculating CPR levels for each week...'],
+    [55, 'Pricing options with Black-Scholes...'],
+    [75, 'Running entry/exit conditions...'],
+    [90, 'Calculating P&L and metrics...'],
+    [100,'Rendering results...'],
+  ];
+
+  for (const [pct, msg] of steps) {
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressText').textContent = msg;
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  const candles = generateNiftyData(fromDate, toDate);
+  const trades  = await runBacktestEngine(candles, currentParams);
+  allTrades     = trades;
+
+  document.getElementById('progressWrap').style.display = 'none';
+  btn.disabled = false; btn.textContent = '▶ Run Backtest';
+
+  if (!trades.length) {
+    toast('No trades found for this period. Try wider date range or looser parameters.', 'warn');
+    return;
+  }
+
+  renderResults(trades);
+  document.getElementById('resultsSection').style.display = 'block';
+  document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+  toast(`Backtest complete — ${trades.length} trades found`, 'success');
+}
+
+// ── RENDER RESULTS ────────────────────────────────────────────
+function renderResults(trades) {
+  const wins   = trades.filter(t => t.pnl > 0);
+  const losses = trades.filter(t => t.pnl < 0);
+  const total  = trades.length;
+  const totalPnl = trades.reduce((s,t) => s+t.pnl, 0);
+  const winRate  = total ? Math.round(wins.length/total*100) : 0;
+  const avgWin   = wins.length ? Math.round(wins.reduce((s,t)=>s+t.pnl,0)/wins.length) : 0;
+  const avgLoss  = losses.length ? Math.round(losses.reduce((s,t)=>s+t.pnl,0)/losses.length) : 0;
+  const grossWin = wins.reduce((s,t)=>s+t.pnl,0);
+  const grossLoss= Math.abs(losses.reduce((s,t)=>s+t.pnl,0));
+  const pf       = grossLoss > 0 ? (grossWin/grossLoss).toFixed(2) : '∞';
+
+  let running=0, peak=0, maxDD=0;
+  trades.forEach(t => { running+=t.pnl; if(running>peak)peak=running; const dd=peak-running; if(dd>maxDD)maxDD=dd; });
+
+  document.getElementById('metricsRow').innerHTML = [
+    {label:'Total P&L',    value: (totalPnl>=0?'+':'')+'₹'+Math.abs(totalPnl).toLocaleString('en-IN'), cls: totalPnl>=0?'g':'r', sub:'net result'},
+    {label:'Win Rate',     value: winRate+'%',           cls:'b',  sub:`${wins.length}W / ${losses.length}L`},
+    {label:'Profit Factor',value: pf,                    cls: parseFloat(pf)>=1?'g':'r', sub:'gross W÷L'},
+    {label:'Max Drawdown', value: '-₹'+maxDD.toLocaleString('en-IN'), cls:'r', sub:'peak to trough'},
+    {label:'Total Trades', value: total,                 cls:'a',  sub:'all directions'},
+    {label:'Avg Win',      value: '₹'+Math.abs(avgWin).toLocaleString('en-IN'),  cls:'g', sub:'per winning trade'},
+    {label:'Avg Loss',     value: '-₹'+Math.abs(avgLoss).toLocaleString('en-IN'), cls:'r', sub:'per losing trade'},
+    {label:'Best Trade',   value: '₹'+Math.max(...trades.map(t=>t.pnl)).toLocaleString('en-IN'), cls:'g', sub:'single trade max'},
+  ].map(m => `<div class="metric"><div class="metric-label">${m.label}</div><div class="metric-value ${m.cls}">${m.value}</div><div class="metric-sub">${m.sub}</div></div>`).join('');
+
+  renderCharts(trades);
+  renderTradeTable(trades);
+}
+
+function renderCharts(trades) {
+  // Equity curve
+  let running = 0;
+  const labels   = trades.map(t => t.entry_date.split(',')[0].split('/').slice(0,2).join('/'));
+  const equityData = trades.map(t => { running += t.pnl; return running; });
+  const barColors  = trades.map(t => t.pnl >= 0 ? 'rgba(0,229,160,.7)' : 'rgba(255,77,109,.7)');
+
+  if (equityChrt) equityChrt.destroy();
+  equityChrt = new Chart(document.getElementById('equityChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label:'Cumulative P&L', data:equityData, borderColor:'#00e5a0', backgroundColor:'rgba(0,229,160,.06)', fill:true, tension:.3, pointRadius:3, pointBackgroundColor:'#00e5a0', yAxisID:'y' },
+        { label:'Trade P&L', data:trades.map(t=>t.pnl), type:'bar', backgroundColor:barColors, borderWidth:0, yAxisID:'y1', barPercentage:.5 },
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins: { legend:{display:false}, tooltip:{ callbacks:{ label: ctx => '₹'+ctx.parsed.y.toLocaleString('en-IN') } } },
+      scales: {
+        y:  { ticks:{callback:v=>'₹'+(v/1000).toFixed(0)+'k',color:'#3d5266',font:{size:10}}, grid:{color:'rgba(255,255,255,.03)'}, border:{display:false} },
+        y1: { display:false },
+        x:  { ticks:{color:'#3d5266',font:{size:9},maxRotation:45,maxTicksLimit:12}, grid:{display:false}, border:{display:false} },
+      }
+    }
+  });
+
+  // Monthly bar chart
+  const months = {};
+  trades.forEach(t => {
+    const parts = t.entry_date.split('/');
+    const m = parts[1] + '/' + (parts[2]||'').split(',')[0];
+    months[m] = (months[m]||0) + t.pnl;
+  });
+  const mKeys   = Object.keys(months);
+  const mData   = Object.values(months);
+  const mColors = mData.map(v => v>=0 ? 'rgba(0,229,160,.75)' : 'rgba(255,77,109,.75)');
+
+  if (monthlyChrt) monthlyChrt.destroy();
+  monthlyChrt = new Chart(document.getElementById('monthlyChart'), {
+    type:'bar',
+    data:{ labels:mKeys, datasets:[{data:mData, backgroundColor:mColors, borderRadius:4}] },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>'₹'+ctx.parsed.y.toLocaleString('en-IN')}}},
+      scales:{
+        y:{ticks:{callback:v=>'₹'+(v/1000).toFixed(0)+'k',color:'#3d5266',font:{size:10}}, grid:{color:'rgba(255,255,255,.03)'}, border:{display:false}},
+        x:{ticks:{color:'#3d5266',font:{size:9}}, grid:{display:false}, border:{display:false}},
+      }
+    }
+  });
+}
+
+function renderTradeTable(trades) {
+  let filtered = trades;
+  if (currentFilter === 'LONG')  filtered = trades.filter(t => t.direction === 'LONG');
+  if (currentFilter === 'SHORT') filtered = trades.filter(t => t.direction === 'SHORT');
+  if (currentFilter === 'win')   filtered = trades.filter(t => t.pnl > 0);
+  if (currentFilter === 'loss')  filtered = trades.filter(t => t.pnl < 0);
+  if (currentFilter === 'TP - R3') filtered = trades.filter(t => t.exit_reason.includes('TP'));
+  if (currentFilter === 'SL')    filtered = trades.filter(t => t.exit_reason.includes('SL'));
+  if (currentFilter === 'EOW')   filtered = trades.filter(t => t.exit_reason.includes('EOW'));
+
+  filtered = [...filtered].sort((a,b) => {
+    const av = a[sortCol], bv = b[sortCol];
+    return sortAsc ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
+  });
+
+  document.getElementById('tradeCount').textContent = `${filtered.length} of ${trades.length} trades`;
+
+  document.getElementById('tradeBody').innerHTML = filtered.map((t,i) => {
+    const isWin = t.pnl > 0;
+    const reasonBadge = t.exit_reason.includes('TP') ? 'badge-tp' : t.exit_reason.includes('SL') ? 'badge-sl' : 'badge-eow';
+    return `<tr class="${isWin ? 'win-row' : 'loss-row'}">
+      <td class="mono" style="color:var(--text3)">${i+1}  ${t.entry_date}</td>
+      <td class="mono" style="color:var(--text3)">${t.exit_date}</td>
+      <td><span class="badge ${t.direction==='LONG'?'badge-long':'badge-short'}">${t.direction}</span></td>
+      <td class="mono">${t.entry_spot.toLocaleString('en-IN')}</td>
+      <td class="mono" style="color:var(--amber)">${t.atm_strike.toLocaleString('en-IN')}</td>
+      <td class="mono" style="color:var(--purple)">${t.otm_strike.toLocaleString('en-IN')}</td>
+      <td class="mono" style="color:var(--green)">₹${t.buy_entry_px}</td>
+      <td class="mono" style="color:var(--red)">₹${t.sell_entry_px}</td>
+      <td class="mono">₹${t.net_entry}</td>
+      <td class="mono" style="color:${isWin?'var(--green)':'var(--red)'}">₹${t.net_exit}</td>
+      <td class="mono" style="color:var(--text2)">₹${t.buy_exit_px} / ₹${t.sell_exit_px}</td>
+      <td><span class="badge ${reasonBadge}">${t.exit_reason}</span></td>
+      <td class="${isWin?'pnl-pos':'pnl-neg'}">${isWin?'+':''} ₹${Math.abs(t.pnl).toLocaleString('en-IN')}</td>
+      <td><span class="badge ${isWin?'badge-win':'badge-loss'}">${isWin?'Win':'Loss'}</span></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="14" class="empty">No trades match filter</td></tr>';
+}
+
+function filterTrades(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.ftab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTradeTable(allTrades);
+}
+
+function sortTable(col) {
+  if (sortCol === col) sortAsc = !sortAsc;
+  else { sortCol = col; sortAsc = true; }
+  renderTradeTable(allTrades);
+}
+
+// ── EXPORT CSV ────────────────────────────────────────────────
+function exportCSV() {
+  if (!allTrades.length) { toast('No trades to export', 'warn'); return; }
+  const headers = Object.keys(allTrades[0]).join(',');
+  const rows    = allTrades.map(t => Object.values(t).join(',')).join('\n');
+  const blob    = new Blob([headers + '\n' + rows], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `backtest_${selectedStrategy}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  toast('CSV exported!', 'success');
+}
+
+// ── PUSH TO SERVER ────────────────────────────────────────────
+function confirmPush() {
+  const changes = Object.keys(currentParams)
+    .filter(k => currentParams[k] !== defaultParams[k])
+    .map(k => `${DEFAULT_PARAMS[k].label}: ${defaultParams[k]} → ${currentParams[k]}`)
+    .join('\n');
+  document.getElementById('pushModalMsg').textContent =
+    `This will update "${selectedStrategy}" on the live server with:\n\n${changes}\n\nBacktest first to verify results before pushing.`;
+  document.getElementById('pushModal').classList.add('open');
+}
+function closePushModal() { document.getElementById('pushModal').classList.remove('open'); }
+
+async function doPush() {
+  closePushModal();
+  try {
+    const res = await fetch(SERVER + '/update-strategy/' + selectedStrategy, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ params: currentParams, secret: 'mysecret123' })
+    });
+    const d = await res.json();
+    if (d.status === 'ok' || res.ok) {
+      Object.keys(currentParams).forEach(k => defaultParams[k] = currentParams[k]);
+      renderParams(); checkChanges();
+      toast('✅ Strategy updated on server!', 'success');
+    } else {
+      toast('Server returned: ' + (d.error || 'Unknown error'), 'warn');
+    }
+  } catch(e) {
+    toast('Could not reach server. Add /update-strategy endpoint first.', 'warn');
+  }
+}
+
+// ── TOAST ─────────────────────────────────────────────────────
+function toast(msg, type='info') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast toast-${type} show`;
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+</script>
+</body>
+</html>
